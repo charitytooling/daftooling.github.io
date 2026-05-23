@@ -240,6 +240,19 @@
 
   .hint { color: var(--text-faint); font-size: 11px; margin-top: 18px; text-align: center; }
   .hidden { display: none !important; }
+
+  /* Per-row upload action (Daftooling -> CharityTooling import) */
+  th.sel, td.sel { width: 36px; padding-left: 10px; padding-right: 4px; text-align: center; cursor: default; }
+  thead th.sel { background: var(--panel-2); }
+  .row-up { background: transparent; border: 1px solid var(--border); color: var(--text-dim);
+    width: 28px; height: 28px; border-radius: 6px;
+    display: inline-flex; align-items: center; justify-content: center;
+    cursor: pointer; transition: color 0.1s, border-color 0.1s, background 0.1s; }
+  .row-up:hover { color: var(--accent-2); border-color: var(--accent-2); }
+  .row-up.is-sent { color: var(--accent); border-color: var(--accent); background: rgba(99, 102, 241, 0.08); }
+  .row-up svg { width: 16px; height: 16px; }
+  .link-btn { background: none; border: none; color: var(--text-dim); font-size: 12px; padding: 0; cursor: pointer; }
+  .link-btn:hover { color: var(--text); text-decoration: underline; }
 </style>
 </head>
 <body>
@@ -288,12 +301,15 @@
   <section class="table-wrap">
     <div class="table-toolbar">
       <div class="info" id="result-info">Loading...</div>
+      <button type="button" id="clear-uploaded" class="link-btn hidden" title="Clear local 'sent' history">
+        Clear sent (<span id="clear-uploaded-count">0</span>)
+      </button>
       <div class="pager" id="pager"></div>
     </div>
     <div style="overflow-x: auto;">
       <table id="data-table">
         <thead><tr id="thead-row"></tr></thead>
-        <tbody id="tbody"><tr><td class="loading" colspan="9">Loading...</td></tr></tbody>
+        <tbody id="tbody"><tr><td class="loading" colspan="10">Loading...</td></tr></tbody>
       </table>
     </div>
   </section>
@@ -367,6 +383,9 @@ const STATE = {
   page: 1,
   pageSize: 50,
   sort: { key: 'r', dir: 'desc' },  // sort keys use the short-key schema
+  // EINs the user has already sent to charitytooling.com in this browser.
+  // Persisted to localStorage so the "Sent" indicator survives page reloads.
+  uploaded: new Set(loadUploadedFromStorage()),
 };
 
 const PRESETS = {
@@ -396,6 +415,7 @@ const ORG_TYPES = [
 // Display columns. `key` is the short-key on each row, except '_LOC' which is
 // a synthetic column. `sortKey` (optional) overrides what we sort by.
 const COLS = [
+  { key: '_SEL', label: 'Send',       sortable: false, css: 'sel' },
   { key: 'n',  label: 'Org name',     sortable: true,  css: 'name' },
   { key: 'e',  label: 'EIN',          sortable: true,  css: 'dim code' },
   { key: '_LOC', label: 'City / State', sortable: false, css: 'dim' },
@@ -405,6 +425,10 @@ const COLS = [
   { key: 'a',  label: 'Assets',       sortable: true,  numeric: true, fmt: 'money' },
   { key: 'ru', label: 'Recognized',   sortable: true,  fmt: 'ruling' },
 ];
+
+// Inline SVGs for the per-row send-to-charitytooling button.
+const UPLOAD_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>';
+const CHECK_SVG  = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polyline points="9 12 12 15 16 10"/></svg>';
 
 const fmtInt = new Intl.NumberFormat('en-US');
 function fmtMoney(v) {
@@ -425,6 +449,13 @@ function fmtRuling(v) {
   return v.slice(0, 4);
 }
 function fmtCell(row, col) {
+  if (col.key === '_SEL') {
+    const isUp = STATE.uploaded.has(row.e);
+    const title = isUp
+      ? 'Sent to CharityTooling. Click to send again.'
+      : 'Send to CharityTooling';
+    return `<button type="button" class="row-up${isUp ? ' is-sent' : ''}" data-ein="${escapeAttr(row.e)}" aria-label="${title}" title="${title}">${isUp ? CHECK_SVG : UPLOAD_SVG}</button>`;
+  }
   if (col.key === '_LOC') {
     const city = row.c || '';
     const state = row.s || '';
@@ -922,6 +953,12 @@ function renderTableHead() {
   tr.innerHTML = '';
   COLS.forEach(c => {
     const th = document.createElement('th');
+    if (c.key === '_SEL') {
+      th.classList.add('sel');
+      th.textContent = c.label;
+      tr.appendChild(th);
+      return;
+    }
     th.textContent = c.label;
     if (c.numeric) th.classList.add('num');
     if (c.sortable) th.classList.add('sortable');
@@ -971,7 +1008,31 @@ function renderTable(pageRows, total, partial) {
     }).join('');
     tbody.innerHTML = html;
     tbody.querySelectorAll('tr').forEach(tr => {
-      tr.addEventListener('click', () => openDetail(tr.dataset.ein));
+      tr.addEventListener('click', (e) => {
+        // Ignore clicks that originate on the per-row upload button; that's
+        // a send-to-charitytooling gesture, not a drill-down.
+        if (e.target && e.target.closest && e.target.closest('.row-up')) return;
+        openDetail(tr.dataset.ein);
+      });
+    });
+    tbody.querySelectorAll('.row-up').forEach((btn) => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const ein = btn.dataset.ein;
+        if (!ein) return;
+        if (STATE.uploaded.has(ein)) {
+          if (!confirm('Send again? CharityTooling will skip duplicates.')) return;
+          sendOneToCharityTooling(ein);
+          return;
+        }
+        // Synchronous: keep window.open in the same gesture as the click so
+        // Safari does not popup-block.
+        sendOneToCharityTooling(ein);
+        STATE.uploaded.add(ein);
+        saveUploadedToStorage();
+        refreshClearUploadedButton();
+        scheduleRender(0);
+      });
     });
   }
 
@@ -1011,6 +1072,78 @@ function renderPager(pages) {
   el.appendChild(mk('Last \u00BB', pages,         STATE.page >= pages));
 }
 
+// localStorage-backed "I've already sent this EIN to charitytooling.com"
+// memory. Per-browser; cleared via the toolbar link or DevTools.
+const UPLOAD_STORAGE_KEY = 'daftooling.uploaded_eins';
+
+function loadUploadedFromStorage() {
+  try {
+    const raw = localStorage.getItem(UPLOAD_STORAGE_KEY);
+    if (!raw) return [];
+    const arr = JSON.parse(raw);
+    return Array.isArray(arr) ? arr.filter((x) => typeof x === 'string') : [];
+  } catch (_) {
+    return [];
+  }
+}
+
+function saveUploadedToStorage() {
+  try {
+    localStorage.setItem(UPLOAD_STORAGE_KEY, JSON.stringify([...STATE.uploaded]));
+  } catch (_) {
+    // Quota / private mode / disabled storage - silently ignore so the
+    // rest of the session still works.
+  }
+}
+
+// One-row handoff to charitytooling.com. Encodes the single row as a JSON
+// blob in ?d= and opens a new tab. CharityTooling reads it at
+// /#/ledger/import-daf and dedups against existing customers by EIN.
+function sendOneToCharityTooling(ein) {
+  const r = DATA.byEin && DATA.byEin.get ? DATA.byEin.get(ein) : null;
+  if (!r) {
+    alert('Row not found in the loaded dataset.');
+    return;
+  }
+  const payload = [{
+    ein: r.e,
+    name: r.n,
+    street: (r.d && r.d.street) || null,
+    city:   r.c || null,
+    state:  r.s || null,
+    zip:    r.z || null,
+    revenue:    Number.isFinite(r.r) ? r.r : null,
+    income:     Number.isFinite(r.i) ? r.i : null,
+    assets:     Number.isFinite(r.a) ? r.a : null,
+    tax_period: (r.d && r.d.tp) || null,
+  }];
+  const isLocal = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
+  const base = isLocal ? 'http://localhost:5173' : 'https://charitytooling.com';
+  const url = base + '/#/ledger/import-daf?d=' + encodeURIComponent(JSON.stringify(payload));
+  window.open(url, '_blank', 'noopener');
+}
+
+// Toggle the toolbar "Clear sent (N)" link to reflect STATE.uploaded.size.
+function refreshClearUploadedButton() {
+  const btn = document.getElementById('clear-uploaded');
+  const cnt = document.getElementById('clear-uploaded-count');
+  if (!btn || !cnt) return;
+  cnt.textContent = String(STATE.uploaded.size);
+  btn.classList.toggle('hidden', STATE.uploaded.size === 0);
+}
+
+function wireClearUploaded() {
+  const btn = document.getElementById('clear-uploaded');
+  if (!btn) return;
+  btn.addEventListener('click', () => {
+    if (!confirm("Clear local 'sent' history? CharityTooling itself is unaffected.")) return;
+    STATE.uploaded.clear();
+    saveUploadedToStorage();
+    refreshClearUploadedButton();
+    scheduleRender(0);
+  });
+}
+
 let _renderTimer = null;
 function scheduleRender(delay) {
   if (delay === 0) {
@@ -1023,6 +1156,10 @@ function scheduleRender(delay) {
   _renderTimer = setTimeout(() => { _renderTimer = null; renderAll(); }, delay ?? 80);
 }
 
+// Cached so the select-all-visible thead checkbox handler can act on the
+// same rows that are currently rendered without recomputing the filter.
+let _lastPageRows = [];
+
 function renderAll() {
   const filtered = runQuery();
   const stats    = computeStats(filtered);
@@ -1030,8 +1167,10 @@ function renderAll() {
   const sorted   = sortRows(filtered);
   const start    = (STATE.page - 1) * STATE.pageSize;
   const pageRows = sorted.slice(start, start + STATE.pageSize);
+  _lastPageRows = pageRows;
   const partial  = DATA.loadedStates.size < DATA.totalStates;
   renderTable(pageRows, filtered.length, partial);
+  refreshClearUploadedButton();
   // Dataset summary stays the same regardless of filter, but updates while
   // we load.
   document.getElementById('dataset-summary').textContent =
@@ -1319,6 +1458,8 @@ function csvEscape(v) {
   buildPresets();
   buildFilters();
   renderTableHead();
+  wireClearUploaded();
+  refreshClearUploadedButton();
   loadAllShards();        // fire-and-forget; updates UI as each shard lands
 })();
 </script>

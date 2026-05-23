@@ -282,7 +282,7 @@ const state = {
     operating_status:  new Set(allOps),
     vetted_status:     new Set(allVetted),
   },
-  latestOnly: false,
+  latestOnly: true,
   search: '',
   sort: { key: 'eoy_daf_assets', dir: 'desc' },
   page: 1,
@@ -635,9 +635,9 @@ document.getElementById('reset-btn').addEventListener('click', () => {
   state.filters.type             = new Set(allTypes);
   state.filters.subtype          = new Set(allSubtypes);
   state.filters.operating_status = new Set(allOps);
-  state.latestOnly = false;
+  state.latestOnly = true;
   const tog = document.getElementById('latest-only-toggle');
-  if (tog) tog.checked = false;
+  if (tog) tog.checked = true;
   state.filters.vetted_status    = new Set(allVetted);
   state.search = '';
   document.getElementById('search').value = '';
