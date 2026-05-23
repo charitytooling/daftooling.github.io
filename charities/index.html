@@ -1,0 +1,1326 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>All Charities (IRS BMF) - DAF Explorer</title>
+<style>
+  :root {
+    --bg: #0a0e1a;
+    --panel: #131826;
+    --panel-2: #1a2030;
+    --border: #232a3d;
+    --text: #e6ebf5;
+    --text-dim: #8b95a8;
+    --text-faint: #5b6478;
+    --accent: #6366f1;
+    --accent-2: #818cf8;
+    --good: #10b981;
+    --warn: #f59e0b;
+    --bad: #ef4444;
+    --chip-bg: #1f2638;
+    --chip-active: #6366f1;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: var(--bg); color: var(--text);
+    font: 14px/1.45 -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", sans-serif; }
+  a { color: var(--accent-2); }
+  button { font: inherit; cursor: pointer; }
+
+  .app { max-width: 1500px; margin: 0 auto; padding: 24px; }
+
+  nav.topnav { display: flex; gap: 4px; margin-bottom: 18px; border-bottom: 1px solid var(--border); }
+  nav.topnav a {
+    display: inline-block; padding: 10px 16px; font-size: 13px; font-weight: 500;
+    color: var(--text-dim); text-decoration: none; border-bottom: 2px solid transparent;
+    margin-bottom: -1px; transition: color 0.12s, border-color 0.12s;
+  }
+  nav.topnav a:hover { color: var(--text); }
+  nav.topnav a.active { color: var(--accent-2); border-bottom-color: var(--accent-2); }
+  nav.topnav a .ext { font-size: 11px; color: var(--text-faint); margin-left: 2px; }
+  nav.topnav a:hover .ext { color: var(--text-dim); }
+
+  header.top { display: flex; align-items: baseline; justify-content: space-between;
+    gap: 16px; margin-bottom: 18px; flex-wrap: wrap; }
+  header.top h1 { margin: 0; font-size: 22px; font-weight: 600; letter-spacing: -0.01em; }
+  header.top h1 .accent { color: var(--accent-2); }
+  header.top .sub { color: var(--text-dim); font-size: 13px; }
+
+  .panel { background: var(--panel); border: 1px solid var(--border);
+    border-radius: 10px; padding: 14px 16px; }
+
+  /* Progressive-load strip */
+  .loadbar { background: var(--panel); border: 1px solid var(--border);
+    border-radius: 10px; padding: 10px 14px; margin-bottom: 12px;
+    display: flex; gap: 14px; align-items: center; font-size: 12px; color: var(--text-dim); }
+  .loadbar .track { flex: 1; height: 6px; background: var(--panel-2); border-radius: 999px;
+    overflow: hidden; }
+  .loadbar .fill { height: 100%; background: var(--accent); width: 0%;
+    transition: width 0.25s ease-out; }
+  .loadbar .pct { font-variant-numeric: tabular-nums; min-width: 36px; text-align: right; }
+  .loadbar.done { color: var(--text-faint); }
+  .loadbar.done .fill { background: var(--good); }
+  .loadbar.hidden { display: none; }
+
+  .stats { display: grid; grid-template-columns: repeat(6, 1fr); gap: 10px;
+    margin-bottom: 14px; }
+  .stat { background: var(--panel); border: 1px solid var(--border);
+    border-radius: 10px; padding: 12px 14px; }
+  .stat .label { display: block; font-size: 11px; text-transform: uppercase;
+    letter-spacing: 0.08em; color: var(--text-faint); margin-bottom: 4px; }
+  .stat .value { display: block; font-size: 18px; font-weight: 600;
+    font-variant-numeric: tabular-nums; }
+  .stat .sub  { display: block; font-size: 11px; color: var(--text-dim);
+    margin-top: 2px; font-variant-numeric: tabular-nums; }
+  @media (max-width: 1100px) { .stats { grid-template-columns: repeat(3, 1fr); } }
+  @media (max-width: 640px)  { .stats { grid-template-columns: repeat(2, 1fr); } }
+
+  .preset-bar { margin-bottom: 14px; }
+  .preset-bar .preset-help { color: var(--text-faint); font-size: 12px; margin-top: 8px; }
+
+  .filters { display: flex; flex-direction: column; gap: 10px; margin-bottom: 14px; }
+  .filter-row { display: flex; gap: 10px; align-items: flex-start; flex-wrap: wrap; }
+  .filter-row .label {
+    min-width: 88px; font-size: 11px; text-transform: uppercase;
+    letter-spacing: 0.08em; color: var(--text-faint); padding-top: 6px;
+  }
+  .filter-row .label .any { font-weight: 400; color: var(--text-faint); opacity: 0.7;
+    margin-left: 4px; }
+  .filter-row .info-icon-btn {
+    background: transparent; border: 1px solid var(--text-faint);
+    color: var(--text-faint); border-radius: 50%;
+    width: 16px; height: 16px; min-width: 16px; padding: 0;
+    font-family: serif; font-size: 10px; font-weight: 700; line-height: 1;
+    cursor: pointer; margin-top: 3px;
+    display: inline-flex; align-items: center; justify-content: center;
+    transition: color 0.1s, border-color 0.1s;
+  }
+  .filter-row .info-icon-btn:hover {
+    color: var(--accent-2); border-color: var(--accent-2);
+  }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; flex: 1; }
+  .chip {
+    background: var(--chip-bg); color: var(--text);
+    border: 1px solid var(--border); border-radius: 999px;
+    padding: 4px 11px; font-size: 12px; cursor: pointer;
+    transition: background 0.12s, border-color 0.12s, color 0.12s;
+    user-select: none; white-space: nowrap;
+  }
+  .chip:hover { border-color: var(--accent); }
+  .chip.active { background: var(--chip-active); border-color: var(--chip-active); color: white; }
+  .chip.preset { background: var(--panel-2); border-color: var(--border); }
+  .chip.preset:hover { border-color: var(--accent-2); color: var(--accent-2); }
+
+  .search-row { display: flex; gap: 10px; align-items: center; margin-bottom: 14px; }
+  .search-row input[type="search"] {
+    flex: 1; background: var(--panel-2); border: 1px solid var(--border);
+    color: var(--text); padding: 9px 12px; border-radius: 8px; font: inherit;
+    outline: none;
+  }
+  .search-row input[type="search"]:focus { border-color: var(--accent); }
+  .btn {
+    background: var(--panel-2); color: var(--text); border: 1px solid var(--border);
+    border-radius: 8px; padding: 8px 13px; font-size: 13px;
+  }
+  .btn:hover { border-color: var(--accent); }
+  .btn.primary { background: var(--accent); border-color: var(--accent); color: white; }
+  .btn.primary:hover { background: var(--accent-2); border-color: var(--accent-2); }
+
+  .table-wrap { background: var(--panel); border: 1px solid var(--border);
+    border-radius: 10px; overflow: hidden; }
+  .table-toolbar { display: flex; align-items: center; justify-content: space-between;
+    padding: 10px 14px; border-bottom: 1px solid var(--border); gap: 10px; flex-wrap: wrap; }
+  .table-toolbar .info { color: var(--text-dim); font-size: 12px;
+    font-variant-numeric: tabular-nums; }
+  .table-toolbar .info .partial {
+    color: var(--warn); margin-left: 8px; font-size: 11px;
+  }
+  .pager { display: flex; gap: 4px; align-items: center; }
+  .pager button { background: var(--panel-2); border: 1px solid var(--border);
+    color: var(--text); border-radius: 6px; padding: 4px 9px; font-size: 12px; }
+  .pager button:hover:not(:disabled) { border-color: var(--accent); }
+  .pager button:disabled { opacity: 0.4; cursor: default; }
+  .pager .page-num { color: var(--text-dim); font-size: 12px; padding: 0 6px;
+    font-variant-numeric: tabular-nums; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  thead th {
+    position: sticky; top: 0; background: var(--panel-2);
+    text-align: left; font-weight: 600; font-size: 11px;
+    text-transform: uppercase; letter-spacing: 0.06em;
+    color: var(--text-dim); padding: 10px 12px; cursor: default;
+    border-bottom: 1px solid var(--border); white-space: nowrap;
+    user-select: none;
+  }
+  thead th.sortable { cursor: pointer; }
+  thead th.sortable:hover { color: var(--text); }
+  thead th.sorted { color: var(--accent-2); }
+  thead th .sort-ind { color: var(--accent-2); margin-left: 4px; }
+  th.num, td.num { text-align: right; font-variant-numeric: tabular-nums; }
+  tbody tr { border-bottom: 1px solid var(--border); cursor: pointer; }
+  tbody tr:hover { background: rgba(99, 102, 241, 0.06); }
+  tbody td { padding: 9px 12px; vertical-align: middle; }
+  tbody td.name { color: var(--text); max-width: 380px; overflow: hidden;
+    text-overflow: ellipsis; white-space: nowrap; font-weight: 500; }
+  tbody td.dim { color: var(--text-dim); }
+  tbody td.code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 12px; color: var(--text-dim); }
+  .badge { display: inline-block; padding: 1px 7px; border-radius: 999px;
+    font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; }
+  .badge.daf { background: var(--accent); color: white; margin-left: 8px; }
+  .empty { padding: 40px; text-align: center; color: var(--text-dim); }
+  .loading { padding: 40px; text-align: center; color: var(--text-faint); }
+
+  /* Modal */
+  .modal-mask { position: fixed; inset: 0; background: rgba(2, 6, 16, 0.7);
+    backdrop-filter: blur(4px); display: flex; align-items: center; justify-content: center;
+    z-index: 50; padding: 24px; }
+  .modal { background: var(--panel); border: 1px solid var(--border);
+    border-radius: 12px; max-width: 1100px; width: 100%; max-height: 90vh;
+    overflow: auto; }
+  .modal-head { display: flex; align-items: flex-start; justify-content: space-between;
+    padding: 16px 20px; border-bottom: 1px solid var(--border); gap: 16px; position: sticky;
+    top: 0; background: var(--panel); z-index: 1; }
+  .modal-head h2 { margin: 0; font-size: 16px; font-weight: 600; }
+  .modal-head .meta { margin-top: 4px; color: var(--text-dim); font-size: 12px; }
+  .modal-close { background: transparent; border: none; color: var(--text-dim);
+    font-size: 22px; line-height: 1; padding: 0 6px; }
+  .modal-close:hover { color: var(--text); }
+
+  /* Helper info modal (separate from the org drill-down) */
+  .info-modal-mask { position: fixed; inset: 0; background: rgba(2, 6, 16, 0.7);
+    backdrop-filter: blur(4px); display: flex; align-items: center; justify-content: center;
+    z-index: 60; padding: 24px; }
+  .info-modal { background: var(--panel); border: 1px solid var(--border);
+    border-radius: 12px; max-width: 720px; width: 100%; max-height: 85vh; overflow: auto; }
+  .info-modal-head { display: flex; align-items: flex-start; justify-content: space-between;
+    padding: 14px 18px; border-bottom: 1px solid var(--border); gap: 16px;
+    position: sticky; top: 0; background: var(--panel); }
+  .info-modal-head h2 { margin: 0; font-size: 15px; font-weight: 600; }
+  .info-modal-head .meta { margin-top: 4px; color: var(--text-dim); font-size: 12px; }
+  .info-modal-body { padding: 12px 18px 18px 18px; }
+  .info-modal-body .ntee-grid { display: grid;
+    grid-template-columns: max-content 1fr max-content; gap: 6px 14px; font-size: 13px; }
+  .info-modal-body .ntee-grid .row { display: contents; cursor: pointer; }
+  .info-modal-body .ntee-grid .code {
+    color: var(--accent-2); font-weight: 700; font-variant-numeric: tabular-nums; }
+  .info-modal-body .ntee-grid .label { color: var(--text); }
+  .info-modal-body .ntee-grid .count {
+    color: var(--text-faint); font-size: 11px;
+    font-variant-numeric: tabular-nums; text-align: right; }
+  .info-modal-body .ntee-grid .row:hover .code,
+  .info-modal-body .ntee-grid .row:hover .label { color: var(--accent-2); }
+  .info-modal-body .ntee-grid .row:hover .count { color: var(--text); }
+  .info-modal-body .actions { display: flex; gap: 8px; margin-top: 14px;
+    padding-top: 12px; border-top: 1px dashed var(--border); flex-wrap: wrap; }
+  .info-modal-body .actions .hint { color: var(--text-faint); font-size: 11px;
+    flex: 1 0 100%; margin-bottom: 4px; }
+  .modal-body { padding: 16px 20px; }
+  .modal-body h3 { font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em;
+    color: var(--text-faint); margin: 18px 0 8px; font-weight: 600; }
+  .modal-body h3:first-child { margin-top: 0; }
+  .modal-body .grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px 24px; }
+  .modal-body .grid .row { display: flex; flex-direction: column; }
+  .modal-body .grid .row .k { font-size: 10px; text-transform: uppercase;
+    letter-spacing: 0.06em; color: var(--text-faint); }
+  .modal-body .grid .row .v { font-size: 13px; }
+  .daf-card { background: var(--panel-2); border: 1px solid var(--accent);
+    border-radius: 8px; padding: 14px 16px; margin-top: 6px; }
+  .daf-card .top-row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+  .daf-card .top-row .label { font-weight: 600; font-size: 12px; color: var(--accent-2); }
+  .modal-body .ext-links { margin-top: 18px; padding-top: 14px;
+    border-top: 1px solid var(--border); display: flex; gap: 12px; flex-wrap: wrap; }
+  .modal-body .ext-links a { font-size: 12px; }
+  .modal table { font-size: 13px; }
+  .modal thead th { background: transparent; position: static; padding: 8px 10px;
+    border-bottom: 1px solid var(--border); cursor: default; }
+  .modal tbody td { padding: 8px 10px; border-bottom: 1px solid var(--border); }
+  .modal tbody tr { cursor: default; }
+  .modal tbody tr:hover { background: transparent; }
+
+  .hint { color: var(--text-faint); font-size: 11px; margin-top: 18px; text-align: center; }
+  .hidden { display: none !important; }
+</style>
+</head>
+<body>
+<div class="app">
+  <nav class="topnav">
+    <a href="../daf/">DAF Sponsors</a>
+    <a href="./" class="active">All Charities (IRS BMF)</a>
+    <a href="../metrics/">DAF Metrics</a>
+    <a href="https://projects.propublica.org/nonprofits/" target="_blank" rel="noopener">ProPublica Nonprofit Explorer <span class="ext">&#8599;</span></a>
+  </nav>
+
+  <header class="top">
+    <div>
+      <h1>All <span class="accent">Charities</span></h1>
+      <div class="sub">IRS Exempt Organizations Business Master File &middot; filtered to ~697k orgs with reported revenue or assets (plus all DAF sponsors).</div>
+    </div>
+    <div class="sub" id="dataset-summary">Loading...</div>
+  </header>
+
+  <div class="loadbar" id="loadbar">
+    <span id="loadbar-text">Loading data...</span>
+    <span class="track"><span class="fill" id="loadbar-fill"></span></span>
+    <span class="pct" id="loadbar-pct">0%</span>
+  </div>
+
+  <section class="stats" id="stats"></section>
+
+  <section class="panel preset-bar">
+    <div class="filter-row">
+      <span class="label">Presets</span>
+      <div id="presets" class="chips"></div>
+    </div>
+    <div class="preset-help">
+      Quick filters tuned for human services prospecting. Combine with State below for "in my area" workflows.
+    </div>
+  </section>
+
+  <section class="panel filters" id="filters"></section>
+
+  <section class="search-row">
+    <input type="search" id="search" placeholder="Search by org name, EIN, or city..." autocomplete="off" />
+    <button class="btn" id="reset-btn">Reset filters</button>
+    <button class="btn primary" id="export-btn">Export CSV</button>
+  </section>
+
+  <section class="table-wrap">
+    <div class="table-toolbar">
+      <div class="info" id="result-info">Loading...</div>
+      <div class="pager" id="pager"></div>
+    </div>
+    <div style="overflow-x: auto;">
+      <table id="data-table">
+        <thead><tr id="thead-row"></tr></thead>
+        <tbody id="tbody"><tr><td class="loading" colspan="9">Loading...</td></tr></tbody>
+      </table>
+    </div>
+  </section>
+
+  <div class="hint">Click any row for full org details &middot; click sortable column headers to sort &middot; chip filter groups are "OR within group, AND across groups"; empty group = no filter</div>
+</div>
+
+<div class="info-modal-mask hidden" id="info-modal-mask">
+  <div class="info-modal">
+    <div class="info-modal-head">
+      <div>
+        <h2 id="info-modal-title"></h2>
+        <div class="meta" id="info-modal-meta"></div>
+      </div>
+      <button class="modal-close" id="info-modal-close">&times;</button>
+    </div>
+    <div class="info-modal-body" id="info-modal-body"></div>
+  </div>
+</div>
+
+<div class="modal-mask hidden" id="modal-mask">
+  <div class="modal" id="modal">
+    <div class="modal-head">
+      <div>
+        <h2 id="modal-title"></h2>
+        <div class="meta" id="modal-meta"></div>
+      </div>
+      <button class="modal-close" id="modal-close">&times;</button>
+    </div>
+    <div class="modal-body" id="modal-body"></div>
+  </div>
+</div>
+
+<script>
+// ============================================================
+// DATA - filled in by the loader below.
+// ============================================================
+const DATA = {
+  rows: [],                    // flat array of all loaded rows, plain objects
+                               //   with the short-key schema from build_shards.py
+  byEin: new Map(),            // EIN -> row, for drill-down
+  loadedStates: new Set(),
+  totalStates: 0,
+  totalRowsExpected: 0,        // from bootstrap.row_count
+  bootstrap: null,
+  dafEins: null,               // Set<EIN>
+  dafHistory: null,            // promise-or-object; lazy-loaded
+  // pre-computed label maps so the modal can render decoded labels.
+  subsectionLabel: {},
+  foundationLabel: {},
+  statusLabel:     {},
+  nteeMajorLabel:  {},
+};
+
+// ============================================================
+// STATE - per-user UI state (filters, sort, search, page).
+// ============================================================
+const STATE = {
+  filters: {
+    states:        new Set(),
+    ntee_majors:   new Set(),
+    ntee_prefixes: new Set(),
+    subsections:   new Set(['03']),
+    statuses:      new Set(['01']),
+    foundations:   new Set(),
+    min_revenue:   0,
+    org_type:      '',
+    daf_only:      false,
+  },
+  search: '',
+  page: 1,
+  pageSize: 50,
+  sort: { key: 'r', dir: 'desc' },  // sort keys use the short-key schema
+};
+
+const PRESETS = {
+  hs_all:    { label: 'All Human Services (P)',           ntee_majors: ['P'] },
+  hs_food:   { label: 'Food security & basic needs',      ntee_prefixes: ['P60','K30','K34','K36','L40','L41'] },
+  hs_family: { label: 'Family services & youth',          ntee_prefixes: ['P40','P42','P43','P44','O20','O30','O50'] },
+  hs_senior: { label: 'Senior & disability services',     ntee_prefixes: ['P81','P82','P85','P86','E70'] },
+  cf:        { label: 'Community foundations (T2)',       ntee_prefixes: ['T2'] },
+  pf:        { label: 'Private foundations only',         org_type: 'private_foundation' },
+  high_rev:  { label: 'Revenue $10M+',                    min_revenue: 10000000 },
+};
+
+const REVENUE_TIERS = [
+  { label: 'Any',     value: 0 },
+  { label: '$100K+',  value: 100000 },
+  { label: '$1M+',    value: 1000000 },
+  { label: '$10M+',   value: 10000000 },
+  { label: '$100M+',  value: 100000000 },
+];
+
+const ORG_TYPES = [
+  { label: 'Any',                 value: '' },
+  { label: 'Public charity',      value: 'public_charity' },
+  { label: 'Private foundation',  value: 'private_foundation' },
+];
+
+// Display columns. `key` is the short-key on each row, except '_LOC' which is
+// a synthetic column. `sortKey` (optional) overrides what we sort by.
+const COLS = [
+  { key: 'n',  label: 'Org name',     sortable: true,  css: 'name' },
+  { key: 'e',  label: 'EIN',          sortable: true,  css: 'dim code' },
+  { key: '_LOC', label: 'City / State', sortable: false, css: 'dim' },
+  { key: 'su', label: '501(c)',       sortable: false, css: 'code' },
+  { key: 'nt', label: 'NTEE',         sortable: false, css: 'code' },
+  { key: 'r',  label: 'Revenue',      sortable: true,  numeric: true, fmt: 'money' },
+  { key: 'a',  label: 'Assets',       sortable: true,  numeric: true, fmt: 'money' },
+  { key: 'ru', label: 'Recognized',   sortable: true,  fmt: 'ruling' },
+];
+
+const fmtInt = new Intl.NumberFormat('en-US');
+function fmtMoney(v) {
+  if (v == null || v === 0) return v === 0 ? '$0' : '\u2014';
+  const a = Math.abs(v);
+  if (a >= 1e12) return '$' + (v/1e12).toFixed(2) + 'T';
+  if (a >= 1e9)  return '$' + (v/1e9 ).toFixed(2) + 'B';
+  if (a >= 1e6)  return '$' + (v/1e6 ).toFixed(2) + 'M';
+  if (a >= 1e3)  return '$' + (v/1e3 ).toFixed(1) + 'K';
+  return '$' + v.toFixed(0);
+}
+function fmtMoneyFull(v) {
+  if (v == null) return '\u2014';
+  return '$' + fmtInt.format(Math.round(v));
+}
+function fmtRuling(v) {
+  if (!v || v === '000000' || v.length < 4) return '\u2014';
+  return v.slice(0, 4);
+}
+function fmtCell(row, col) {
+  if (col.key === '_LOC') {
+    const city = row.c || '';
+    const state = row.s || '';
+    if (!city && !state) return '<span class="dim">\u2014</span>';
+    return escapeHtml(city) + (state ? ', ' + escapeHtml(state) : '');
+  }
+  const v = row[col.key];
+  if (v == null || v === '') return '<span class="dim">\u2014</span>';
+  if (col.fmt === 'money')  return fmtMoney(v);
+  if (col.fmt === 'ruling') return fmtRuling(v);
+  if (col.key === 'n') {
+    const html = escapeHtml(String(v));
+    return html + (DATA.dafEins.has(row.e) ? '<span class="badge daf">DAF</span>' : '');
+  }
+  return escapeHtml(String(v));
+}
+function escapeHtml(s) {
+  return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+function escapeAttr(s) {
+  return String(s ?? '').replace(/[&"<>]/g, c => ({'&':'&amp;','"':'&quot;','<':'&lt;','>':'&gt;'}[c]));
+}
+
+// ============================================================
+// Loader: bootstrap + per-state shards in revenue-priority order.
+// ============================================================
+async function loadBootstrap() {
+  const r = await fetch('../data/bootstrap.json');
+  if (!r.ok) throw new Error('bootstrap.json failed: ' + r.status);
+  const boot = await r.json();
+  DATA.bootstrap = boot;
+  DATA.dafEins   = new Set(boot.daf_eins);
+  DATA.totalStates       = boot.manifest.length;
+  DATA.totalRowsExpected = boot.row_count;
+
+  for (const o of boot.lookups.subsection) DATA.subsectionLabel[o.code] = o.label;
+  for (const o of boot.lookups.foundation) DATA.foundationLabel[o.code] = o.label;
+  for (const o of boot.lookups.status)     DATA.statusLabel[o.code]     = o.label;
+  for (const o of boot.lookups.ntee)       DATA.nteeMajorLabel[o.code]  = o.label;
+}
+
+async function loadShard(entry) {
+  const r = await fetch('../data/' + entry.url);
+  if (!r.ok) throw new Error(entry.url + ' failed: ' + r.status);
+  const rows = await r.json();
+  for (const row of rows) {
+    DATA.rows.push(row);
+    DATA.byEin.set(row.e, row);
+  }
+  DATA.loadedStates.add(entry.code);
+  bumpProgress();
+}
+
+async function loadAllShards() {
+  // Largest-state-first so the default "top by revenue" view fills in fast.
+  const order = DATA.bootstrap.manifest.slice().sort((a, b) => b.rows - a.rows);
+  // Throttle concurrency so we don't open 51 sockets and stall the bootstrap
+  // render. Browsers cap at 6 per origin anyway, but being explicit avoids
+  // Safari quirks.
+  const CONCURRENT = 8;
+  let nextIdx = 0;
+  let firstReady = false;
+  async function worker() {
+    while (nextIdx < order.length) {
+      const i = nextIdx++;
+      try {
+        await loadShard(order[i]);
+      } catch (e) {
+        console.error('shard load failed', order[i].code, e);
+      }
+      // Re-render after each shard so the user sees partial results.
+      // Coalesce to avoid hammering the layout while many land at once.
+      scheduleRender();
+      if (!firstReady) {
+        firstReady = true;
+        document.getElementById('result-info').textContent = '';
+      }
+    }
+  }
+  await Promise.all(Array.from({length: CONCURRENT}, worker));
+  document.getElementById('loadbar').classList.add('done');
+  document.getElementById('loadbar-text').textContent = 'All states loaded';
+  renderAll();
+}
+
+// ----- DAF history lazy loader (small, ~200 KB gz) -----
+let _dafHistoryPromise = null;
+function ensureDafHistory() {
+  if (DATA.dafHistory) return Promise.resolve(DATA.dafHistory);
+  if (_dafHistoryPromise) return _dafHistoryPromise;
+  _dafHistoryPromise = fetch('../data/daf_history.json')
+    .then(r => r.ok ? r.json() : {})
+    .then(j => { DATA.dafHistory = j; return j; })
+    .catch(() => ({}));
+  return _dafHistoryPromise;
+}
+
+// ----- progress bar -----
+function bumpProgress() {
+  const done = DATA.loadedStates.size;
+  const total = DATA.totalStates;
+  const pct = total ? Math.round(100 * done / total) : 0;
+  document.getElementById('loadbar-fill').style.width = pct + '%';
+  document.getElementById('loadbar-pct').textContent = pct + '%';
+  document.getElementById('loadbar-text').textContent =
+    `Loaded ${done} of ${total} states (${fmtInt.format(DATA.rows.length)} orgs so far)`;
+}
+
+// ============================================================
+// Query engine: in-memory filter / sort / paginate.
+// ============================================================
+
+// Cached "last filtered" so the pager / sort doesn't re-run the filter
+// when only the page changes. Invalidated by any state change that affects
+// the predicate.
+let _cachedFiltered = null;
+let _cachedKey = '';
+function _filterKey() {
+  const f = STATE.filters;
+  return JSON.stringify([
+    [...f.states].sort(),
+    [...f.ntee_majors].sort(),
+    [...f.ntee_prefixes].sort(),
+    [...f.subsections].sort(),
+    [...f.statuses].sort(),
+    [...f.foundations].sort(),
+    f.min_revenue, f.org_type, f.daf_only,
+    STATE.search,
+    DATA.rows.length,  // re-filter as more shards land
+  ]);
+}
+
+function runQuery() {
+  const k = _filterKey();
+  if (k === _cachedKey && _cachedFiltered) return _cachedFiltered;
+  const f = STATE.filters;
+  const hasStates = f.states.size > 0;
+  const hasMajors = f.ntee_majors.size > 0;
+  const hasPrefixes = f.ntee_prefixes.size > 0;
+  const hasSubs   = f.subsections.size > 0;
+  const hasStatus = f.statuses.size > 0;
+  const hasFound  = f.foundations.size > 0;
+  const minRev    = f.min_revenue || 0;
+  const orgType   = f.org_type || '';
+  const dafOnly   = !!f.daf_only;
+  const prefixes  = [...f.ntee_prefixes];
+  const dafSet    = DATA.dafEins;
+  const needle    = (STATE.search || '').trim().toLowerCase();
+
+  const out = [];
+  const rows = DATA.rows;
+  const len  = rows.length;
+  for (let i = 0; i < len; i++) {
+    const r = rows[i];
+    if (hasStates && !f.states.has(r.s || '')) continue;
+    if (hasMajors && !f.ntee_majors.has(r.nm || '')) continue;
+    if (hasSubs   && !f.subsections.has(r.su || '')) continue;
+    if (hasStatus && !f.statuses.has(r.st || '')) continue;
+    if (hasFound  && !f.foundations.has(r.f || '')) continue;
+    if (minRev    > 0 && (r.r || 0) < minRev) continue;
+    if (dafOnly   && !dafSet.has(r.e)) continue;
+    if (orgType === 'public_charity') {
+      if (r.su !== '03' || (r.f && (r.f === '02' || r.f === '03' || r.f === '04'))) continue;
+    } else if (orgType === 'private_foundation') {
+      if (r.su !== '03' || (r.f !== '02' && r.f !== '03' && r.f !== '04')) continue;
+    }
+    if (hasPrefixes) {
+      const nt = r.nt || '';
+      let pmatch = false;
+      for (let p = 0; p < prefixes.length; p++) {
+        if (nt.startsWith(prefixes[p])) { pmatch = true; break; }
+      }
+      if (!pmatch) continue;
+    }
+    if (needle) {
+      const n = (r.n || '').toLowerCase();
+      const c = (r.c || '').toLowerCase();
+      if (n.indexOf(needle) === -1 &&
+          c.indexOf(needle) === -1 &&
+          r.e.indexOf(needle) === -1) continue;
+    }
+    out.push(r);
+  }
+  _cachedFiltered = out;
+  _cachedKey = k;
+  return out;
+}
+
+function sortRows(rows) {
+  const key = STATE.sort.key;
+  const desc = STATE.sort.dir === 'desc';
+  const isNum = (key === 'r' || key === 'a');
+  const sorted = rows.slice();
+  if (isNum) {
+    sorted.sort((x, y) => {
+      const a = x[key] || 0, b = y[key] || 0;
+      if (a === b) return (x.n || '').localeCompare(y.n || '');
+      return desc ? b - a : a - b;
+    });
+  } else {
+    sorted.sort((x, y) => {
+      const a = x[key] || '', b = y[key] || '';
+      const cmp = String(a).localeCompare(String(b));
+      if (cmp !== 0) return desc ? -cmp : cmp;
+      return (x.n || '').localeCompare(y.n || '');
+    });
+  }
+  return sorted;
+}
+
+function computeStats(rows) {
+  let count = 0, rev = 0, ast = 0, inc = 0, pub = 0, pri = 0, daf = 0;
+  for (let i = 0; i < rows.length; i++) {
+    const r = rows[i];
+    count++;
+    rev += r.r || 0;
+    ast += r.a || 0;
+    inc += r.i || 0;
+    if (r.su === '03') {
+      if (r.f === '02' || r.f === '03' || r.f === '04') pri++; else pub++;
+    }
+    if (DATA.dafEins.has(r.e)) daf++;
+  }
+  return { count, total_revenue: rev, total_assets: ast, total_income: inc,
+           public_charities: pub, private_foundations: pri, daf_sponsor_count: daf };
+}
+
+// ============================================================
+// Rendering
+// ============================================================
+function chipsFor(label, key, values, formatter, opts) {
+  opts = opts || {};
+  const wrap = document.createElement('div');
+  wrap.className = 'filter-row';
+  wrap.dataset.key = key;
+  const labelEl = document.createElement('span');
+  labelEl.className = 'label';
+  labelEl.dataset.text = label;
+  labelEl.textContent = label;
+  wrap.appendChild(labelEl);
+  if (opts.helpClick) {
+    const info = document.createElement('button');
+    info.type = 'button';
+    info.className = 'info-icon-btn';
+    info.textContent = 'i';
+    info.title = opts.helpTitle || 'Show all categories';
+    info.addEventListener('click', opts.helpClick);
+    wrap.appendChild(info);
+  }
+  const chips = document.createElement('div');
+  chips.className = 'chips';
+  values.forEach(v => {
+    const el = document.createElement('button');
+    el.type = 'button';
+    el.className = 'chip';
+    el.textContent = formatter ? formatter(v) : v;
+    el.dataset.value = String(v);
+    el.title = formatter && formatter.long ? formatter.long(v) : '';
+    el.addEventListener('click', (e) => onChipClick(key, v, e));
+    chips.appendChild(el);
+  });
+  wrap.appendChild(chips);
+  return wrap;
+}
+
+function onChipClick(key, value, event) {
+  const set = STATE.filters[key];
+  if (!set || !(set instanceof Set)) return;
+  if (event && event.shiftKey) {
+    set.clear();
+    set.add(String(value));
+  } else if (set.has(String(value))) {
+    set.delete(String(value));
+  } else {
+    set.add(String(value));
+  }
+  STATE.page = 1;
+  refreshChipVisuals();
+  scheduleRender(0);
+}
+
+function refreshChipVisuals() {
+  document.querySelectorAll('#filters .filter-row').forEach(row => {
+    const key = row.dataset.key;
+    const set = STATE.filters[key];
+    const labelEl = row.querySelector('.label');
+    if (set instanceof Set) {
+      if (set.size === 0) {
+        labelEl.innerHTML = labelEl.dataset.text + ' <span class="any">any</span>';
+      } else {
+        labelEl.textContent = labelEl.dataset.text;
+      }
+      row.querySelectorAll('.chip').forEach(c => {
+        if (set.has(c.dataset.value)) c.classList.add('active');
+        else c.classList.remove('active');
+      });
+    } else {
+      labelEl.textContent = labelEl.dataset.text;
+      let cur = STATE.filters[key];
+      if (cur === true)  cur = '1';
+      if (cur === false || cur == null) cur = '';
+      cur = String(cur);
+      row.querySelectorAll('.chip').forEach(c => {
+        if (c.dataset.value === cur) c.classList.add('active');
+        else c.classList.remove('active');
+      });
+    }
+  });
+}
+
+function buildFilters() {
+  const root = document.getElementById('filters');
+  root.innerHTML = '';
+
+  // State - alphabetical, with row-count tooltip from bootstrap.state_counts
+  const stateValues = DATA.bootstrap.manifest.map(m => m.code).slice().sort();
+  const sc = DATA.bootstrap.state_counts || {};
+  const stateRow = chipsFor('State', 'states', stateValues, Object.assign(
+    v => v,
+    { long: v => `${v} - ${fmtInt.format(sc[v] || 0)} orgs` }
+  ));
+  root.appendChild(stateRow);
+
+  // NTEE major
+  const nteeFacets = DATA.bootstrap.lookups.ntee;
+  const nteeValues = nteeFacets.map(o => o.code);
+  const nteeLabel = {};
+  nteeFacets.forEach(o => { nteeLabel[o.code] = o.label; });
+  const nteeRow = chipsFor('NTEE', 'ntee_majors', nteeValues, Object.assign(
+    v => `${v} - ${(nteeLabel[v] || '').split(/[&,]/)[0].trim()}`,
+    { long: v => `${v}: ${nteeLabel[v] || ''}` }
+  ), {
+    helpClick: openNteeHelp,
+    helpTitle: 'See all NTEE major categories',
+  });
+  root.appendChild(nteeRow);
+
+  // Subsection (common ones first)
+  const subsCommon = ['03','04','06','07','09','19','40'];
+  const subLabel = DATA.subsectionLabel;
+  const allSubs = DATA.bootstrap.lookups.subsection.map(o => o.code);
+  const subValues = subsCommon.filter(c => c in subLabel)
+    .concat(allSubs.filter(c => !subsCommon.includes(c)));
+  const subRow = chipsFor('501(c)', 'subsections', subValues, Object.assign(
+    v => `(${parseInt(v, 10)})`,
+    { long: v => subLabel[v] || v }
+  ));
+  root.appendChild(subRow);
+
+  // Status
+  const statusValues = DATA.bootstrap.lookups.status.map(o => o.code);
+  const statusRow = chipsFor('Status', 'statuses', statusValues, Object.assign(
+    v => DATA.statusLabel[v] || v,
+    { long: v => DATA.statusLabel[v] || v }
+  ));
+  root.appendChild(statusRow);
+
+  // Org type (single-value)
+  const orgRow = document.createElement('div');
+  orgRow.className = 'filter-row';
+  orgRow.dataset.key = 'org_type';
+  const ol = document.createElement('span'); ol.className = 'label';
+  ol.dataset.text = 'Org type'; ol.textContent = 'Org type';
+  orgRow.appendChild(ol);
+  const oc = document.createElement('div'); oc.className = 'chips';
+  ORG_TYPES.forEach(t => {
+    const el = document.createElement('button');
+    el.type = 'button'; el.className = 'chip'; el.textContent = t.label;
+    el.dataset.value = t.value;
+    el.addEventListener('click', () => {
+      STATE.filters.org_type = t.value;
+      STATE.page = 1;
+      refreshChipVisuals();
+      scheduleRender(0);
+    });
+    oc.appendChild(el);
+  });
+  orgRow.appendChild(oc);
+  root.appendChild(orgRow);
+
+  // Revenue tier (single-value, stored as min_revenue)
+  const revRow = document.createElement('div');
+  revRow.className = 'filter-row';
+  revRow.dataset.key = 'min_revenue';
+  const rl = document.createElement('span'); rl.className = 'label';
+  rl.dataset.text = 'Revenue'; rl.textContent = 'Revenue';
+  revRow.appendChild(rl);
+  const rc = document.createElement('div'); rc.className = 'chips';
+  REVENUE_TIERS.forEach(t => {
+    const el = document.createElement('button');
+    el.type = 'button'; el.className = 'chip'; el.textContent = t.label;
+    el.dataset.value = String(t.value);
+    el.addEventListener('click', () => {
+      STATE.filters.min_revenue = t.value;
+      STATE.page = 1;
+      refreshChipVisuals();
+      scheduleRender(0);
+    });
+    rc.appendChild(el);
+  });
+  revRow.appendChild(rc);
+  root.appendChild(revRow);
+
+  // DAF-only toggle (single-value, stored as daf_only boolean)
+  const dafRow = document.createElement('div');
+  dafRow.className = 'filter-row';
+  dafRow.dataset.key = 'daf_only';
+  const dl = document.createElement('span'); dl.className = 'label';
+  dl.dataset.text = 'DAF status'; dl.textContent = 'DAF status';
+  dafRow.appendChild(dl);
+  const dc = document.createElement('div'); dc.className = 'chips';
+  [
+    { label: 'Any',                value: '' },
+    { label: 'DAF sponsors only',  value: '1' },
+  ].forEach(t => {
+    const el = document.createElement('button');
+    el.type = 'button'; el.className = 'chip'; el.textContent = t.label;
+    el.dataset.value = t.value;
+    el.addEventListener('click', () => {
+      STATE.filters.daf_only = (t.value === '1');
+      STATE.page = 1;
+      refreshChipVisuals();
+      scheduleRender(0);
+    });
+    dc.appendChild(el);
+  });
+  dafRow.appendChild(dc);
+  root.appendChild(dafRow);
+
+  refreshChipVisuals();
+}
+
+function buildPresets() {
+  const root = document.getElementById('presets');
+  root.innerHTML = '';
+  Object.entries(PRESETS).forEach(([id, p]) => {
+    const el = document.createElement('button');
+    el.type = 'button';
+    el.className = 'chip preset';
+    el.textContent = p.label;
+    el.addEventListener('click', () => applyPreset(id));
+    root.appendChild(el);
+  });
+  const clear = document.createElement('button');
+  clear.type = 'button';
+  clear.className = 'chip preset';
+  clear.textContent = 'Clear NTEE';
+  clear.addEventListener('click', () => {
+    STATE.filters.ntee_majors.clear();
+    STATE.filters.ntee_prefixes.clear();
+    STATE.filters.org_type = '';
+    STATE.filters.min_revenue = 0;
+    STATE.page = 1;
+    refreshChipVisuals();
+    scheduleRender(0);
+  });
+  root.appendChild(clear);
+}
+
+function applyPreset(id) {
+  const p = PRESETS[id];
+  if (!p) return;
+  STATE.filters.ntee_majors.clear();
+  STATE.filters.ntee_prefixes.clear();
+  (p.ntee_majors   || []).forEach(v => STATE.filters.ntee_majors.add(v));
+  (p.ntee_prefixes || []).forEach(v => STATE.filters.ntee_prefixes.add(v));
+  if (p.org_type !== undefined)    STATE.filters.org_type = p.org_type;
+  if (p.min_revenue !== undefined) STATE.filters.min_revenue = p.min_revenue;
+  STATE.page = 1;
+  refreshChipVisuals();
+  scheduleRender(0);
+}
+
+// ----- rendering: stats -----
+function renderStats(stats) {
+  const cards = [
+    { label: 'Orgs matching',     value: fmtInt.format(stats.count) },
+    { label: 'Public charities',  value: fmtInt.format(stats.public_charities) },
+    { label: 'Private foundations', value: fmtInt.format(stats.private_foundations) },
+    { label: 'Total revenue',     value: fmtMoney(stats.total_revenue), sub: fmtMoneyFull(stats.total_revenue) },
+    { label: 'Total assets',      value: fmtMoney(stats.total_assets),  sub: fmtMoneyFull(stats.total_assets) },
+    { label: 'DAF sponsors here', value: fmtInt.format(stats.daf_sponsor_count) },
+  ];
+  document.getElementById('stats').innerHTML = cards.map(s =>
+    `<div class="stat"><span class="label">${s.label}</span>
+      <span class="value">${s.value}</span>
+      ${s.sub ? `<span class="sub">${s.sub}</span>` : ''}
+    </div>`
+  ).join('');
+}
+
+// ----- rendering: table -----
+function renderTableHead() {
+  const tr = document.getElementById('thead-row');
+  tr.innerHTML = '';
+  COLS.forEach(c => {
+    const th = document.createElement('th');
+    th.textContent = c.label;
+    if (c.numeric) th.classList.add('num');
+    if (c.sortable) th.classList.add('sortable');
+    if (STATE.sort.key === c.key) {
+      th.classList.add('sorted');
+      const ind = document.createElement('span');
+      ind.className = 'sort-ind';
+      ind.textContent = STATE.sort.dir === 'asc' ? '\u25B2' : '\u25BC';
+      th.appendChild(ind);
+    }
+    if (c.sortable) {
+      th.addEventListener('click', () => {
+        if (STATE.sort.key === c.key) {
+          STATE.sort.dir = STATE.sort.dir === 'asc' ? 'desc' : 'asc';
+        } else {
+          STATE.sort.key = c.key;
+          STATE.sort.dir = c.numeric ? 'desc' : 'asc';
+        }
+        renderTableHead();
+        renderAll();
+      });
+    }
+    tr.appendChild(th);
+  });
+}
+
+function renderTable(pageRows, total, partial) {
+  const pages = Math.max(1, Math.ceil(total / STATE.pageSize));
+  if (STATE.page > pages) STATE.page = pages;
+  const start = (STATE.page - 1) * STATE.pageSize;
+
+  const tbody = document.getElementById('tbody');
+  if (!pageRows || pageRows.length === 0) {
+    tbody.innerHTML = '<tr><td class="empty" colspan="' + COLS.length + '">'
+      + (partial ? 'No matches yet - still loading more states.' : 'No orgs match the current filters.')
+      + '</td></tr>';
+  } else {
+    const html = pageRows.map(r => {
+      const tds = COLS.map(c => {
+        const klass = [c.numeric ? 'num' : '', c.css || ''].filter(Boolean).join(' ');
+        const title = (c.key === 'nt' && r.nt)
+          ? ` title="${escapeAttr((r.nm || '') + ' - ' + (DATA.nteeMajorLabel[r.nm] || ''))}"`
+          : '';
+        return `<td class="${klass}"${title}>${fmtCell(r, c)}</td>`;
+      }).join('');
+      return `<tr data-ein="${escapeAttr(r.e)}">${tds}</tr>`;
+    }).join('');
+    tbody.innerHTML = html;
+    tbody.querySelectorAll('tr').forEach(tr => {
+      tr.addEventListener('click', () => openDetail(tr.dataset.ein));
+    });
+  }
+
+  const info = document.getElementById('result-info');
+  const partialNote = partial
+    ? ` <span class="partial">(partial \u2014 ${DATA.loadedStates.size}/${DATA.totalStates} states loaded)</span>`
+    : '';
+  info.innerHTML =
+    (total === 0
+      ? 'No matches'
+      : `Showing ${fmtInt.format(start + 1)}\u2013${fmtInt.format(Math.min(start + STATE.pageSize, total))} of ${fmtInt.format(total)}`)
+    + partialNote;
+  renderPager(pages);
+}
+
+function renderPager(pages) {
+  const el = document.getElementById('pager');
+  el.innerHTML = '';
+  const mk = (label, page, disabled) => {
+    const b = document.createElement('button');
+    b.textContent = label;
+    b.disabled = !!disabled;
+    if (!disabled) b.addEventListener('click', () => {
+      STATE.page = page;
+      renderAll();
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    });
+    return b;
+  };
+  el.appendChild(mk('\u00AB First', 1, STATE.page === 1));
+  el.appendChild(mk('\u2039 Prev',  STATE.page - 1, STATE.page === 1));
+  const span = document.createElement('span');
+  span.className = 'page-num';
+  span.textContent = `Page ${STATE.page} of ${pages}`;
+  el.appendChild(span);
+  el.appendChild(mk('Next \u203A', STATE.page + 1, STATE.page >= pages));
+  el.appendChild(mk('Last \u00BB', pages,         STATE.page >= pages));
+}
+
+let _renderTimer = null;
+function scheduleRender(delay) {
+  if (delay === 0) {
+    clearTimeout(_renderTimer);
+    _renderTimer = null;
+    renderAll();
+    return;
+  }
+  if (_renderTimer) return;  // coalesce
+  _renderTimer = setTimeout(() => { _renderTimer = null; renderAll(); }, delay ?? 80);
+}
+
+function renderAll() {
+  const filtered = runQuery();
+  const stats    = computeStats(filtered);
+  renderStats(stats);
+  const sorted   = sortRows(filtered);
+  const start    = (STATE.page - 1) * STATE.pageSize;
+  const pageRows = sorted.slice(start, start + STATE.pageSize);
+  const partial  = DATA.loadedStates.size < DATA.totalStates;
+  renderTable(pageRows, filtered.length, partial);
+  // Dataset summary stays the same regardless of filter, but updates while
+  // we load.
+  document.getElementById('dataset-summary').textContent =
+    `${fmtInt.format(DATA.rows.length)} of ${fmtInt.format(DATA.totalRowsExpected)} orgs loaded \u00B7 ${DATA.bootstrap.lookups.ntee.length} NTEE categories`;
+}
+
+// ============================================================
+// Detail modal
+// ============================================================
+async function openDetail(ein) {
+  const body = document.getElementById('modal-body');
+  document.getElementById('modal-title').textContent = 'Loading...';
+  document.getElementById('modal-meta').textContent = ein;
+  body.innerHTML = '<div class="loading">Loading...</div>';
+  document.getElementById('modal-mask').classList.remove('hidden');
+
+  const bmf = DATA.byEin.get(ein);
+  if (!bmf) {
+    body.innerHTML = '<div class="empty">No record found for EIN ' + escapeHtml(ein) + '</div>';
+    return;
+  }
+
+  document.getElementById('modal-title').textContent = bmf.n || '(no name)';
+  const subsection_label = DATA.subsectionLabel[bmf.su || ''] || '';
+  const foundation_label = DATA.foundationLabel[bmf.f  || ''] || '';
+  const status_label     = DATA.statusLabel[bmf.st || ''] || '';
+  const ntee_major_label = DATA.nteeMajorLabel[bmf.nm || ''] || '';
+
+  const metaParts = ['EIN ' + bmf.e];
+  if (subsection_label) metaParts.push(subsection_label);
+  if (status_label)     metaParts.push(status_label);
+  if (bmf.nt)           metaParts.push('NTEE ' + bmf.nt + (ntee_major_label ? ' / ' + ntee_major_label : ''));
+  document.getElementById('modal-meta').textContent = metaParts.join(' \u00B7 ');
+
+  let dafEntry = null;
+  if (DATA.dafEins.has(ein)) {
+    const hist = await ensureDafHistory();
+    dafEntry = hist[ein] || null;
+  }
+
+  const d = bmf.d || {};
+  let html = '';
+
+  if (dafEntry && dafEntry.years && dafEntry.years.length) {
+    const latest = dafEntry.years[dafEntry.years.length - 1];
+    html += '<div class="daf-card"><div class="top-row">';
+    html += '<span class="badge daf">DAF Sponsor</span>';
+    html += '<span class="label">This org sponsors Donor-Advised Funds</span>';
+    html += '</div>';
+    html += `<div style="color:var(--text-dim); font-size:12px; margin-bottom:10px">
+      Type: <strong>${escapeHtml(dafEntry.type || '')}</strong> / ${escapeHtml(dafEntry.subtype || '')}
+      &middot; Latest year: <strong>${latest.y}</strong>
+    </div>`;
+    html += '<table style="width:100%"><thead><tr>'
+      + '<th>Year</th><th class="num">Accounts</th><th class="num">Contributions</th>'
+      + '<th class="num">Grants</th><th class="num">EOY Assets</th><th class="num">Payout %</th>'
+      + '</tr></thead><tbody>';
+    let prevA = null;
+    for (const r of dafEntry.years) {
+      const a = r.a;
+      const avgA = (prevA != null && a != null) ? (prevA + a) / 2 : null;
+      const payout = (r.g != null && avgA && avgA > 0) ? (100 * r.g / avgA) : null;
+      html += `<tr>
+        <td>${r.y}</td>
+        <td class="num">${r.acc != null ? fmtInt.format(r.acc) : '\u2014'}</td>
+        <td class="num">${fmtMoneyFull(r.con)}</td>
+        <td class="num">${fmtMoneyFull(r.g)}</td>
+        <td class="num">${fmtMoneyFull(r.a)}</td>
+        <td class="num">${payout != null ? payout.toFixed(1) + '%' : '\u2014'}</td>
+      </tr>`;
+      prevA = a;
+    }
+    html += '</tbody></table>';
+    html += '<div style="margin-top:10px; font-size:12px;"><a href="../daf/">View on DAF Sponsors page \u2192</a></div>';
+    html += '</div>';
+  }
+
+  html += '<h3>Address &amp; contact</h3>';
+  html += '<div class="grid">';
+  html += row('Street',  d.street);
+  html += row('City',    bmf.c);
+  html += row('State',   bmf.s);
+  html += row('ZIP',     bmf.z);
+  html += row('In care of', d.ico);
+  html += row('IRS recognized', fmtRuling(bmf.ru) === '\u2014' ? '\u2014' : fmtRuling(bmf.ru));
+  html += '</div>';
+
+  html += '<h3>Classification</h3>';
+  html += '<div class="grid">';
+  html += row('Subsection',    subsection_label || bmf.su);
+  html += row('Foundation',    foundation_label || bmf.f);
+  html += row('Status',        status_label || bmf.st);
+  html += row('NTEE',          (bmf.nt || '\u2014') + (ntee_major_label ? ` (${ntee_major_label})` : ''));
+  html += row('Deductibility', d.ded);
+  html += row('Tax period',    d.tp);
+  html += '</div>';
+
+  html += '<h3>Financials (most recent return)</h3>';
+  html += '<div class="grid">';
+  html += row('Revenue', fmtMoneyFull(bmf.r));
+  html += row('Income',  fmtMoneyFull(bmf.i));
+  html += row('Assets',  fmtMoneyFull(bmf.a));
+  html += '</div>';
+
+  html += `<div class="ext-links">
+    <a href="https://projects.propublica.org/nonprofits/organizations/${encodeURIComponent(bmf.e)}" target="_blank" rel="noopener">ProPublica Nonprofit Explorer \u2197</a>
+    <a href="https://www.causeiq.com/search/?search=${encodeURIComponent(bmf.e)}" target="_blank" rel="noopener">CauseIQ \u2197</a>
+    <a href="https://apps.irs.gov/app/eos/displayAll.do?dispatchMethod=displayAllInfo&ein=${encodeURIComponent(bmf.e)}" target="_blank" rel="noopener">IRS Tax-Exempt Org Search \u2197</a>
+  </div>`;
+
+  body.innerHTML = html;
+}
+
+function row(k, v) {
+  return `<div class="row"><span class="k">${escapeHtml(k)}</span><span class="v">${(v == null || v === '') ? '<span class="dim">\u2014</span>' : escapeHtml(String(v))}</span></div>`;
+}
+
+document.getElementById('modal-close').addEventListener('click', closeModal);
+document.getElementById('modal-mask').addEventListener('click', e => {
+  if (e.target.id === 'modal-mask') closeModal();
+});
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') { closeModal(); closeInfoModal(); }
+});
+function closeModal() { document.getElementById('modal-mask').classList.add('hidden'); }
+
+// ============================================================
+// NTEE helper modal
+// ============================================================
+document.getElementById('info-modal-close').addEventListener('click', closeInfoModal);
+document.getElementById('info-modal-mask').addEventListener('click', e => {
+  if (e.target.id === 'info-modal-mask') closeInfoModal();
+});
+function closeInfoModal() { document.getElementById('info-modal-mask').classList.add('hidden'); }
+
+function openNteeHelp() {
+  const facets = DATA.bootstrap.lookups.ntee || [];
+  const labelMap = {};
+  const countMap = {};
+  facets.forEach(o => {
+    labelMap[o.code] = o.label;
+    countMap[o.code] = o.count || 0;
+  });
+  const letters = [];
+  for (let c = 65; c <= 90; c++) letters.push(String.fromCharCode(c));
+  facets.forEach(o => { if (!letters.includes(o.code)) letters.push(o.code); });
+
+  const fSet = STATE.filters.ntee_majors;
+  const active = fSet.size;
+
+  let html = '<div class="ntee-grid">';
+  for (const code of letters) {
+    const label = labelMap[code] || (code === 'Z' ? 'Unknown' : '\u2014');
+    const present = code in labelMap;
+    const count = countMap[code] || 0;
+    html += `<div class="row" data-code="${escapeAttr(code)}" data-present="${present ? '1' : '0'}">
+      <span class="code">${escapeHtml(code)}</span>
+      <span class="label">${escapeHtml(label)}</span>
+      <span class="count">${present ? fmtInt.format(count) + ' orgs' : 'not in dataset'}</span>
+    </div>`;
+  }
+  html += '</div>';
+  html += `<div class="actions">
+    <div class="hint">Click a category to solo it in the NTEE filter (replaces the current NTEE selection). The "Reset filters" button restores defaults.</div>
+    <button class="btn" id="ntee-solo-p">Solo &mdash; P (Human Services)</button>
+    <button class="btn" id="ntee-solo-t">Solo &mdash; T (Philanthropy)</button>
+    <button class="btn" id="ntee-restore">Clear NTEE filter</button>
+  </div>`;
+
+  document.getElementById('info-modal-title').textContent = 'NTEE major categories';
+  document.getElementById('info-modal-meta').textContent =
+    active === 0
+      ? 'No NTEE filter active (all categories pass). Click a row to filter to just that one.'
+      : `${active} of ${facets.length} categories currently active. Click a row to replace the selection.`;
+  document.getElementById('info-modal-body').innerHTML = html;
+
+  document.querySelectorAll('#info-modal-body .ntee-grid .row').forEach(r => {
+    r.addEventListener('click', () => {
+      if (r.dataset.present !== '1') return;
+      const code = r.dataset.code;
+      STATE.filters.ntee_majors = new Set([code]);
+      STATE.page = 1;
+      refreshChipVisuals();
+      scheduleRender(0);
+      closeInfoModal();
+    });
+  });
+  const soloP = document.getElementById('ntee-solo-p');
+  if (soloP) soloP.addEventListener('click', () => {
+    STATE.filters.ntee_majors = new Set(['P']);
+    STATE.page = 1; refreshChipVisuals(); scheduleRender(0); closeInfoModal();
+  });
+  const soloT = document.getElementById('ntee-solo-t');
+  if (soloT) soloT.addEventListener('click', () => {
+    STATE.filters.ntee_majors = new Set(['T']);
+    STATE.page = 1; refreshChipVisuals(); scheduleRender(0); closeInfoModal();
+  });
+  const restore = document.getElementById('ntee-restore');
+  if (restore) restore.addEventListener('click', () => {
+    STATE.filters.ntee_majors.clear();
+    STATE.page = 1; refreshChipVisuals(); scheduleRender(0); closeInfoModal();
+  });
+
+  document.getElementById('info-modal-mask').classList.remove('hidden');
+}
+
+// ============================================================
+// Search + buttons
+// ============================================================
+let searchTimer = null;
+document.getElementById('search').addEventListener('input', e => {
+  STATE.search = e.target.value;
+  STATE.page = 1;
+  clearTimeout(searchTimer);
+  searchTimer = setTimeout(() => scheduleRender(0), 200);
+});
+
+document.getElementById('reset-btn').addEventListener('click', () => {
+  STATE.filters.states.clear();
+  STATE.filters.ntee_majors.clear();
+  STATE.filters.ntee_prefixes.clear();
+  STATE.filters.subsections = new Set(['03']);
+  STATE.filters.statuses = new Set(['01']);
+  STATE.filters.foundations.clear();
+  STATE.filters.min_revenue = 0;
+  STATE.filters.org_type = '';
+  STATE.filters.daf_only = false;
+  STATE.search = '';
+  document.getElementById('search').value = '';
+  STATE.page = 1;
+  STATE.sort = { key: 'r', dir: 'desc' };
+  refreshChipVisuals();
+  renderTableHead();
+  scheduleRender(0);
+});
+
+document.getElementById('export-btn').addEventListener('click', () => {
+  const filtered = sortRows(runQuery());
+  const cols = ['EIN','NAME','STREET','CITY','STATE','ZIP','SUBSECTION','FOUNDATION','STATUS','NTEE_CD','ntee_major','REVENUE_AMT','ASSET_AMT','INCOME_AMT','RULING','is_daf'];
+  const lines = [cols.join(',')];
+  for (const r of filtered) {
+    const d = r.d || {};
+    const fields = [
+      r.e, r.n, d.street || '', r.c || '', r.s || '', r.z || '',
+      r.su || '', r.f || '', r.st || '',
+      r.nt || '', r.nm || '',
+      r.r != null ? r.r : '',
+      r.a != null ? r.a : '',
+      r.i != null ? r.i : '',
+      r.ru || '',
+      DATA.dafEins.has(r.e) ? '1' : '0',
+    ];
+    lines.push(fields.map(csvEscape).join(','));
+  }
+  const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `charities-${new Date().toISOString().slice(0,10)}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+});
+function csvEscape(v) {
+  const s = String(v ?? '');
+  if (/[",\n\r]/.test(s)) return '"' + s.replace(/"/g, '""') + '"';
+  return s;
+}
+
+// ============================================================
+// init
+// ============================================================
+(async function init() {
+  try {
+    await loadBootstrap();
+  } catch (e) {
+    document.getElementById('loadbar').classList.add('hidden');
+    document.getElementById('tbody').innerHTML =
+      '<tr><td class="empty" colspan="' + COLS.length + '">Failed to load bootstrap.json: '
+      + escapeHtml(e.message) + '<br><br>Run <code>python3 build_shards.py</code> '
+      + 'to regenerate the data shards.</td></tr>';
+    return;
+  }
+  buildPresets();
+  buildFilters();
+  renderTableHead();
+  loadAllShards();        // fire-and-forget; updates UI as each shard lands
+})();
+</script>
+</body>
+</html>
